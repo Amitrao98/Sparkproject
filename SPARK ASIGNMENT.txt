@@ -1,0 +1,239 @@
+1.1. Download the data from the given URL :
+https://www.kaggle.com/datasets/kimjihoo/coronavirusdataset
+
+2. Create a producer with a python connector in confluent kafka and
+stream your data.
+
+To create a producer with Python and stream data to Confluent Kafka, you can use the confluent-kafka-python library. Here's an example code snippet:
+
+from confluent_kafka import Producer
+import json
+
+# Set up the configuration for the Kafka producer
+conf = {'bootstrap.servers': 'localhost:9092'}
+
+# Create an instance of the Kafka producer
+producer = Producer(conf)
+
+# Define a callback function to handle delivery reports
+def delivery_report(err, msg):
+    if err is not None:
+        print('Message delivery failed: {}'.format(err))
+    else:
+        print('Message delivered to {} [{}]'.format(msg.topic(), msg.partition()))
+
+# Generate some data to stream
+data = {'name': 'John Doe', 'age': 30, 'city': 'New York'}
+
+# Serialize the data to JSON format
+json_data = json.dumps(data).encode('utf-8')
+
+# Stream the data to the Kafka topic 'test'
+producer.produce('test', key=b'key', value=json_data, callback=delivery_report)
+
+# Wait for any outstanding messages to be delivered and delivery reports to be received
+producer.flush()
+
+In this example, we first set up the configuration for the Kafka producer by specifying the bootstrap servers. We then create an instance of the Kafka producer using this configuration.
+
+Next, we define a callback function that will be called when the message delivery status is received. This function will print a message indicating whether the delivery was successful or not.
+
+We then generate some sample data and serialize it to JSON format. We stream the data to the Kafka topic 'test' using the produce method of the Kafka producer instance, specifying the topic, key, value, and callback function.
+
+Finally, we call the flush method to wait for any outstanding messages to be delivered and delivery reports to be received.
+
+Note that you will need to have a running instance of Kafka and a topic named 'test' set up in order to successfully stream the data.
+
+3.To consume data from Kafka and dump it into MongoDB Atlas, we need to do the following:
+
+Connect to Kafka using the Kafka Python client.
+Connect to MongoDB Atlas using the PyMongo Python client.
+Create a Kafka consumer and subscribe to the relevant topic(s).
+Consume messages from Kafka and insert them into MongoDB.
+Here's a sample code to achieve this:
+
+from kafka import KafkaConsumer
+import pymongo
+import json
+
+# Connect to Kafka
+consumer = KafkaConsumer('your_topic_name',
+                         bootstrap_servers=['your_kafka_server:9092'],
+                         auto_offset_reset='earliest',
+                         enable_auto_commit=True,
+                         group_id='my-group',
+                         value_deserializer=lambda x: json.loads(x.decode('utf-8')))
+
+# Connect to MongoDB Atlas
+client = pymongo.MongoClient("mongodb+srv://<username>:<password>@cluster0.mongodb.net/test?retryWrites=true&w=majority")
+db = client.test
+
+# Insert consumed messages into MongoDB
+for message in consumer:
+    data = message.value
+    db.my_collection.insert_one(data)
+
+Replace your_topic_name with the name of the Kafka topic you want to consume from, and your_kafka_server with the address of your Kafka server.
+
+Replace <username> and <password> with your MongoDB Atlas username and password, and my_collection with the name of the collection you want to insert data into.
+
+Note: You may need to install the kafka-python and pymongo packages using pip before running the code.
+
+
+4.To perform these operations, we first need to install and import the necessary packages:
+
+!pip install pyspark
+!pip install pymongo
+!pip install dnspython
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import *
+from pyspark.sql.types import *
+from pymongo import MongoClient
+
+a. Read the data, show it and Count the number of records.
+
+spark = SparkSession.builder.appName("CovidData").getOrCreate()
+df_case = spark.read.csv("/path/to/case.csv", header=True)
+df_region = spark.read.csv("/path/to/region.csv", header=True)
+df_timeprov = spark.read.csv("/path/to/TimeProvince.csv", header=True)
+
+# Show the data
+df_case.show()
+df_region.show()
+df_timeprov.show()
+
+# Count the number of records
+print("Number of records in case.csv:", df_case.count())
+print("Number of records in region.csv:", df_region.count())
+print("Number of records in TimeProvince.csv:", df_timeprov.count())
+
+b. Describe the data with a describe function.
+
+df_case.describe().show()
+df_region.describe().show()
+df_timeprov.describe().show()
+
+c. If there is any duplicate value drop it.
+
+df_case = df_case.dropDuplicates()
+df_region = df_region.dropDuplicates()
+df_timeprov = df_timeprov.dropDuplicates()
+
+d. Use limit function for showcasing a limited number of records.
+
+df_case.limit(10).show()
+df_region.limit(10).show()
+df_timeprov.limit(10).show()
+
+e. If you find the column name is not suitable, change the column name.[optional]
+
+# Rename columns
+df_case = df_case.withColumnRenamed("infection_case", "case")
+df_region = df_region.withColumnRenamed("province", "state")
+df_timeprov = df_timeprov.withColumnRenamed("_c0", "id")
+
+f. Select the subset of the columns.
+
+df_case.select("case", "confirmed", "latitude", "longitude").show()
+df_region.select("id", "state", "latitude", "longitude").show()
+df_timeprov.select("date", "confirmed", "deceased").show()
+
+
+g. If there is any null value, fill it with any random value or drop it.
+
+# Drop rows with null values
+df_case = df_case.dropna()
+df_region = df_region.dropna()
+df_timeprov = df_timeprov.dropna()
+
+h. Filter the data based on different columns or variables and do the best analysis.
+
+For example: We can filter a data frame using multiple conditions using AND(&), OR(|) and NOT(~) conditions. For example, we may want to find out all the different infection cases in Daegu Province with more than 10 confirmed cases.
+
+df_case.filter((col("confirmed") > 10) & (col("province") == "Daegu")).select("case", "confirmed").show()
+
+i. Sort the number of confirmed cases. Confirmed column is there in the dataset. Check with descending sort also.
+
+df_case.sort(desc("confirmed")).show()
+
+j. In case of any wrong data type, cast that data type from integer to string or string to integer.
+
+df_case = df_case.withColumn("id", col("id").cast(StringType()))
+df_region = df_region.withColumn("latitude", col("latitude").cast(FloatType()))
+df_timeprov = df_timeprov.withColumn("deceased", col("deceased").cast(IntegerType()))
+
+k.To perform the group by operation on the cases dataframe, we can use the groupBy function and pass the columns to group by. Then we can use the agg function and pass the aggregation function sum along with the column to aggregate on. The resulting dataframe will have the total confirmed cases for each province and city combination.
+
+from pyspark.sql import functions as F
+
+# group by province and city and aggregate the confirmed cases
+grouped_cases = cases.groupBy(["province", "city"]).agg(F.sum("confirmed").alias("total_confirmed"))
+
+# show the resulting dataframe
+grouped_cases.show()
+
+l.For the join operation, we can use the join function and pass the regions dataframe along with the columns to join on and the join type. Here we will perform a left join on the province and city columns. The resulting dataframe will have the latitude and longitude information for each province and city combination.
+
+# perform a left join with the regions dataframe
+joined_df = cases.join(regions, ["province", "city"], "left")
+
+# show the resulting dataframe
+joined_df.show()
+
+5.To use SQL with data frames in PySpark, we need to first create a temporary table with the registerTempTable() function. Then, we can use the sqlContext.sql() function to run SQL queries on the table. Here is an example of using SQL to perform some operations on the cases dataframe:
+
+# Register the cases dataframe as a temporary table
+cases.registerTempTable("cases_table")
+
+# Use SQL to filter cases with confirmed cases greater than 100
+newDF = sqlContext.sql("SELECT * FROM cases_table WHERE confirmed > 100")
+newDF.show()
+
+# Use SQL to group by province and sum the confirmed cases
+groupByProvince = sqlContext.sql("SELECT province, SUM(confirmed) as total_confirmed FROM cases_table GROUP BY province")
+groupByProvince.show()
+
+# Use SQL to filter and order by confirmed cases in descending order
+filterAndOrder = sqlContext.sql("SELECT * FROM cases_table WHERE province = 'Seoul' ORDER BY confirmed DESC")
+filterAndOrder.show()
+
+
+In this example, we first register the cases dataframe as a temporary table named cases_table. Then, we use SQL to filter the table to only show cases with confirmed cases greater than 100, and save the result in a new dataframe named newDF.
+
+Next, we use SQL to group the cases_table by province and sum the confirmed cases, and save the result in a new dataframe named groupByProvince.
+
+Finally, we use SQL to filter the cases_table to only show cases in the Seoul province, and order the result by confirmed cases in descending order, and save the result in a new dataframe named filterAndOrder.
+
+Note that in order to use SQL with data frames in PySpark, we need to first import the necessary libraries:
+
+from pyspark.sql import SQLContext
+from pyspark.sql.functions import *
+
+Also, we need to create a SQLContext object before we can use SQL:
+
+sqlContext = SQLContext(spark)
+
+
+6.To create a UDF in PySpark:
+
+from pyspark.sql.functions import udf
+from pyspark.sql.types import StringType
+
+def casehighlow(confirmed_cases):
+    if confirmed_cases < 50:
+        return "low"
+    else:
+        return "high"
+
+casehighlow_udf = udf(casehighlow, StringType())
+
+In this example, casehighlow() is a function that takes a single argument confirmed_cases, and returns a string indicating whether the number of confirmed cases is "low" or "high". We then use the udf() function to wrap our function and create a UDF called casehighlow_udf, specifying that the return type is a string. Once we have defined our UDF, we can apply it to a DataFrame column using the withColumn() method, like this:
+
+
+from pyspark.sql.functions import col
+
+# assuming our DataFrame is called "cases"
+cases_with_highlow = cases.withColumn("case_level", casehighlow_udf(col("confirmed")))
+
+
+This will add a new column to our DataFrame called "case_level", which contains the result of applying the casehighlow_udf UDF to the "confirmed" column.
